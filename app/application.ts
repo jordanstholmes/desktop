@@ -1,65 +1,82 @@
-import { App, IpcMain, Shell } from 'electron';
+import { App, IpcMain, Shell, dialog } from 'electron';
+import fs from 'fs';
 import path from 'path';
-import index from './index.html';
 import { ArchiveManager } from './javascripts/main/archiveManager';
 import { createExtensionsServer } from './javascripts/main/extServer';
+import { buildIndexFile } from './javascripts/main/indexBuilder';
 import { MenuManager } from './javascripts/main/menus';
 import { isLinux, isMac, isWindows } from './javascripts/main/platforms';
 import { Store, StoreKeys } from './javascripts/main/store';
 import { AppName, initializeStrings } from './javascripts/main/strings';
+import { isDev } from './javascripts/main/utils';
 import { createWindowState, WindowState } from './javascripts/main/window';
 import { IpcMessages } from './javascripts/shared/ipcMessages';
-import { isDev } from './javascripts/main/utils';
 
 export interface AppState {
   readonly store: Store;
   readonly startUrl: string;
+  readonly webRoot: string;
+  readonly extensionsServerAddress: Promise<string>;
   isPrimaryInstance: boolean;
   willQuitApp: boolean;
 
   windowState?: WindowState;
 }
 
-export function initializeApplication(args: {
-  app: Electron.App;
-  ipcMain: Electron.IpcMain;
-  shell: Shell;
-}) {
-  const { app } = args;
-
+export function initializeApplication(
+  app: App,
+  ipcMain: IpcMain,
+  shell: Shell
+) {
   app.name = AppName;
   app.allowRendererProcessReuse = true;
 
   const isPrimaryInstance = app.requestSingleInstanceLock();
 
+  const webRoot =
+    'APP_RELATIVE_PATH' in process.env
+      ? path.join(__dirname, process.env.APP_RELATIVE_PATH as string)
+      : __dirname;
+
+  const startUrl = path.join(app.getPath('userData'), 'index.html');
+
   const state: AppState = {
     store: new Store(app.getPath('userData')),
-    startUrl: determineStartUrl(),
+    startUrl,
+    webRoot,
+    extensionsServerAddress: initializeExtensionsServer(startUrl, webRoot),
     isPrimaryInstance,
     willQuitApp: false,
   };
-  registerSingleInstanceHandler(app, state);
-  registerAppEventListeners({
-    ...args,
-    state,
+
+  state.extensionsServerAddress.catch((error) => {
+    dialog.showMessageBoxSync({
+      message: error.toString(),
+    });
+    app.quit();
   });
 
+  registerSingleInstanceHandler(app, state);
+  registerAppEventListeners({ app, ipcMain, shell, state });
+
   if (isDev()) {
-    /** Expose the app's state as a global variable. Useful for debugging */
+    /** Expose the app's state as a global variable for debugging purposes */
     (global as any).appState = state;
   }
 }
 
-function determineStartUrl(): string {
-  if ('APP_RELATIVE_PATH' in process.env) {
-    return path.join(
-      'file://',
-      __dirname,
-      process.env.APP_RELATIVE_PATH as string,
-      index
-    );
-  }
-  return path.join('file://', __dirname, index);
+async function initializeExtensionsServer(
+  startUrl: string,
+  webRoot: string
+): Promise<string> {
+  const hostNamePromise = createExtensionsServer();
+  const hostName = await hostNamePromise;
+  await fs.promises.writeFile(
+    startUrl,
+    buildIndexFile({ hostName, baseUrl: webRoot }),
+    'utf-8'
+  );
+  return hostName;
 }
 
 function registerSingleInstanceHandler(
@@ -117,7 +134,7 @@ function registerAppEventListeners(args: {
   });
 }
 
-function finishApplicationInitialization({
+async function finishApplicationInitialization({
   app,
   ipcMain,
   shell,
@@ -129,7 +146,6 @@ function finishApplicationInitialization({
   state: AppState;
 }) {
   initializeStrings(app.getLocale());
-  initializeExtensionsServer(state.store);
   const windowState = createWindowState({
     shell,
     appState: state,
@@ -141,6 +157,7 @@ function finishApplicationInitialization({
   state.windowState = windowState;
   registerIpcEventListeners(
     ipcMain,
+    state,
     windowState.menuManager,
     windowState.archiveManager
   );
@@ -152,16 +169,13 @@ function finishApplicationInitialization({
     state.windowState.trayManager.createTrayIcon();
   }
 
+  await state.extensionsServerAddress;
   windowState.window.loadURL(state.startUrl);
-}
-
-function initializeExtensionsServer(store: Store) {
-  const host = createExtensionsServer();
-  store.set(StoreKeys.ExtServerHost, host);
 }
 
 function registerIpcEventListeners(
   ipcMain: Electron.IpcMain,
+  state: Pick<AppState, 'store' | 'extensionsServerAddress'>,
   menuManager: MenuManager,
   archiveManager: ArchiveManager
 ) {
@@ -175,5 +189,27 @@ function registerIpcEventListeners(
 
   ipcMain.on(IpcMessages.MajorDataChange, () => {
     archiveManager.performBackup();
+  });
+
+  ipcMain.handle(
+    IpcMessages.ExtensionsServerAddress,
+    () => state.extensionsServerAddress
+  );
+
+  ipcMain.handle(IpcMessages.UseSystemMenuBar, () =>
+    state.store.get(StoreKeys.UseSystemMenuBar)
+  );
+
+  ipcMain.handle(IpcMessages.WebRoot, () => {
+    console.log();
+    if ('APP_RELATIVE_PATH' in process.env) {
+      return path.join(
+        'file://',
+        __dirname,
+        process.env.APP_RELATIVE_PATH as string
+      );
+    } else {
+      return path.join('file://', __dirname);
+    }
   });
 }

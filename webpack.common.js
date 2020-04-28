@@ -23,7 +23,11 @@ module.exports = function ({ onlyTranspileTypescript = false } = {}) {
         loader: 'babel-loader',
       },
       {
-        test: /\.(png|html)$/i,
+        test: /\.html$/i,
+        loader: 'html-loader',
+      },
+      {
+        test: /\.png$/i,
         loader: 'file-loader',
         options: {
           name: '[name].[ext]',

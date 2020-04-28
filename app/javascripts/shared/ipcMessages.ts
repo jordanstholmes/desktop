@@ -11,4 +11,7 @@ export enum IpcMessages {
   InstallComponentComplete = 'install-component-complete',
   DisplayAppMenu = 'display-app-menu',
   DataArchive = 'data-archive',
+  ExtensionsServerAddress = 'extensions-server-address',
+  UseSystemMenuBar = 'use-system-menu-bar',
+  WebRoot = 'web-root',
 }

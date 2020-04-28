@@ -13,6 +13,7 @@ window.isElectron = true;
   await receiver.ready;
   const bridge = receiver.items[0];
   configureWindow(bridge);
+  loadZipLibrary(bridge);
 
   await new Promise((resolve) => angular.element(document).ready(resolve));
   const desktopManager = angular
@@ -22,7 +23,6 @@ window.isElectron = true;
   registerIpcMessageListener(desktopManager, bridge);
   configureDesktopManager(desktopManager, bridge);
 })();
-loadZipLibrary();
 
 async function configureWindow(bridge) {
   const [isMacOS, useSystemMenuBar, appVersion] = await Promise.all([
@@ -156,14 +156,15 @@ function registerIpcMessageListener(desktopManager, bridge) {
   });
 }
 
-async function loadZipLibrary() {
+async function loadZipLibrary(bridge) {
+  const indexRoot = await bridge.baseUrl;
   // load zip library (for exporting items as zip)
   const scriptTag = document.createElement('script');
-  scriptTag.src = './vendor/zip/zip.js';
+  scriptTag.src = indexRoot + '/vendor/zip/zip.js';
   scriptTag.async = true;
   const headTag = document.getElementsByTagName('head')[0];
   headTag.appendChild(scriptTag);
   scriptTag.onload = () => {
-    zip.workerScriptsPath = './vendor/zip/';
+    zip.workerScriptsPath = indexRoot + '/vendor/zip/';
   };
 }

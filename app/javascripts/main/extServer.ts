@@ -6,6 +6,7 @@ import path from 'path';
 import { URL } from 'url';
 import { FileDoesNotExist } from './fileUtils';
 import { extensions as str } from './strings';
+import { AddressInfo } from 'net';
 
 const Protocol = 'http';
 const UserDataPath = app.getPath('userData');
@@ -77,11 +78,13 @@ function onRequestError(error: Error | { code: string }, res: ServerResponse) {
 }
 
 export function createExtensionsServer() {
-  const port = 45653;
-  const ip = '127.0.0.1';
-  const host = `${Protocol}://${ip}:${port}/`;
-  http.createServer(handleRequest).listen(port, ip, () => {
-    log(`Server started at ${host}`);
+  return new Promise<string>((resolve) => {
+    const ip = '127.0.0.1';
+    const server = http.createServer(handleRequest).listen(0, ip, () => {
+      const address = server.address() as AddressInfo;
+      const host = `${Protocol}://${ip}:${address.port}/`;
+      log(`Server started at ${host}`);
+      resolve(host);
+    });
   });
-  return host;
 }

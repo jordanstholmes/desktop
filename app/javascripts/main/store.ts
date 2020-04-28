@@ -2,18 +2,17 @@ import { app, remote } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import { MessageType } from '../../../test/TestIpcMessage';
-import { Language } from './spellcheckerManager';
-import { ensureIsBoolean, isTesting, stringOrNull, isDev } from './utils';
-import { FileDoesNotExist } from './fileUtils';
 import { BackupsDirectoryName } from './archiveManager';
+import { FileDoesNotExist } from './fileUtils';
+import { Language } from './spellcheckerManager';
 import { handle } from './testing';
+import { ensureIsBoolean, isDev, isTesting } from './utils';
 
 function logError(...message: any) {
   console.error('store:', ...message);
 }
 
 export enum StoreKeys {
-  ExtServerHost = 'extServerHost',
   UseSystemMenuBar = 'useSystemMenuBar',
   MenuBarVisible = 'isMenuBarVisible',
   BackupsLocation = 'backupsLocation',
@@ -24,7 +23,6 @@ export enum StoreKeys {
 }
 
 interface StoreData {
-  [StoreKeys.ExtServerHost]: string | null;
   [StoreKeys.UseSystemMenuBar]: boolean;
   [StoreKeys.MenuBarVisible]: boolean;
   [StoreKeys.BackupsLocation]: string;
@@ -52,7 +50,6 @@ function createSanitizedStoreData(data: any = {}): StoreData {
       data[StoreKeys.MinimizeToTray],
       false
     ),
-    [StoreKeys.ExtServerHost]: stringOrNull(data[StoreKeys.ExtServerHost]),
     [StoreKeys.BackupsLocation]: sanitizeBackupsLocation(
       data[StoreKeys.BackupsLocation]
     ),

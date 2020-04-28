@@ -1,17 +1,18 @@
 import { IpcMessages } from '../shared/ipcMessages';
-import { Store, StoreKeys } from '../main/store';
 const {
   Transmitter,
   FrameMessageBus,
   Validation,
 } = require('sn-electron-valence/Transmitter');
-const { ipcRenderer, remote } = require('electron');
-const path = require('path');
+import { ipcRenderer, remote } from 'electron';
+import path from 'path';
+
 const rendererPath = path.join('file://', __dirname, '/renderer.js');
 
 const { PropertyType } = Validation;
 const messageBus = new FrameMessageBus();
 const transmitter = new Transmitter(messageBus, {
+  baseUrl: PropertyType.VALUE,
   isMacOS: PropertyType.VALUE,
   appVersion: PropertyType.VALUE,
   extServerHost: PropertyType.VALUE,
@@ -32,13 +33,16 @@ process.once('loaded', function () {
   listenForIpcEvents();
 });
 
-function loadTransmitter() {
+async function loadTransmitter() {
   transmitter.expose({
-    extServerHost: Store.get(StoreKeys.ExtServerHost),
+    baseUrl: await ipcRenderer.invoke(IpcMessages.WebRoot),
+    extServerHost: await ipcRenderer.invoke(
+      IpcMessages.ExtensionsServerAddress
+    ),
     rendererPath,
     isMacOS: process.platform === 'darwin',
     appVersion: remote.app.getVersion(),
-    useSystemMenuBar: Store.get(StoreKeys.UseSystemMenuBar),
+    useSystemMenuBar: await ipcRenderer.invoke(IpcMessages.UseSystemMenuBar),
 
     /**
      * All functions must be async, as electron-valence expects to run .then()

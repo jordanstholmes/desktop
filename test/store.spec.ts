@@ -7,10 +7,10 @@ async function validateData(t: ExecutionContext<Driver>) {
   const data = await t.context.store.dataOnDisk();
 
   /**
-   * There should always be 8 values in the store.
+   * There should always be 7 values in the store.
    * If one was added/removed intentionally, update this number
    */
-  const numberOfStoreKeys = 8;
+  const numberOfStoreKeys = 7;
   t.is(Object.keys(data).length, numberOfStoreKeys);
 
   t.is(typeof data.isMenuBarVisible, 'boolean');
@@ -23,13 +23,6 @@ async function validateData(t: ExecutionContext<Driver>) {
 
   t.is(typeof data.zoomFactor, 'number');
   t.true(data.zoomFactor > 0);
-
-  t.is(typeof data.extServerHost, 'string');
-  /** Must not throw */
-  const extServerHost = new URL(data.extServerHost);
-  t.is(extServerHost.hostname, '127.0.0.1');
-  t.is(extServerHost.protocol, 'http:');
-  t.is(extServerHost.port, '45653');
 
   t.is(typeof data.backupsLocation, 'string');
 
